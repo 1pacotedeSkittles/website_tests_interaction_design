@@ -2,9 +2,8 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    /* Impede seleção acidental de texto na mesa multitoque */
+    /* Impede a seleção de texto e o zoom nativo do ecrã inteiro na mesa multitoque */
     user-select: none; 
-    /* Impede comportamentos nativos de toque (scroll/zoom) */
     touch-action: none; 
 }
 
@@ -27,7 +26,7 @@ body {
     box-shadow: 0 0 20px rgba(0,0,0,0.5);
 }
 
-/* SIDEBAR */
+/* --- BARRA LATERAL --- */
 .sidebar {
     width: 80px;
     background-color: #f2f2f2;
@@ -40,23 +39,25 @@ body {
     z-index: 10;
 }
 
-/* PALCO */
+/* --- PALCO --- */
 .stage {
     flex: 1;
     position: relative;
     background-color: #ffffff;
-    overflow: hidden; /* Corta formas que saiam dos limites */
+    overflow: hidden; /* Esconde as partes das formas que saiam fora do ecrã */
 }
 
-/* BASE DAS FORMAS */
+/* --- ESTILO GERAL DAS FORMAS --- */
 .tool, .stage-item {
     cursor: grab;
+    /* Origem da transformação no centro para que o zoom cresça para todos os lados por igual */
+    transform-origin: center center; 
 }
 .tool:active, .stage-item:active {
     cursor: grabbing;
 }
 
-/* DESENHO DAS FORMAS (CSS Puro) */
+/* --- DESENHO DAS FORMAS --- */
 .shape-circle {
     width: 40px;
     height: 40px;
@@ -79,20 +80,21 @@ body {
 }
 
 .shape-line {
-    width: 40px;
+    width: 45px;
     height: 4px;
     background-color: #333;
-    transform: rotate(-45deg);
+    /* A linha original na barra lateral já tem a rotação */
+    transform: rotate(-45deg); 
 }
 
-/* ESTILOS DOS ELEMENTOS QUANDO ESTÃO NO PALCO */
+/* --- FORMAS QUANDO ESTÃO NO PALCO --- */
 .stage-item {
     position: absolute;
-    /* Centra o cursor no meio da forma */
+    /* Centra a forma exatamente na ponta do dedo do utilizador */
     transform: translate(-50%, -50%);
 }
 
 .stage-item.shape-line {
-    /* A linha precisa de manter a rotação além de estar centrada */
+    /* A linha no palco precisa de manter o translate E a rotação em simultâneo */
     transform: translate(-50%, -50%) rotate(-45deg);
 }
