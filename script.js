@@ -1,35 +1,33 @@
 // ============================================================================
-// 0. PROTEÇÃO MÁXIMA CONTRA ZOOM NATIVO DO BROWSER
+// 0. BLOQUEIOS DE GESTOS NATIVOS DO BROWSER (SAFARI E CHROME)
 // ============================================================================
 document.addEventListener('wheel', (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive: false });
 document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-document.addEventListener('gesturestart', e => e.preventDefault());
-document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('gesturechange', (e) => e.preventDefault());
+document.addEventListener('gestureend', (e) => e.preventDefault());
 
 const tools = document.querySelectorAll('.tool');
 const stage = document.getElementById('stage');
 
-// Garantir que as ferramentas da barra também não ativam scrolls nativos
 tools.forEach(tool => tool.style.touchAction = 'none');
 
 // ============================================================================
-// 1. O MOTOR DE GESTOS MULTITOQUE (COZINHADO DE FORMA ÉPICA)
+// 1. MOTOR NATIVO DE MULTI-TOUCH (SAFARI / CHROME COMPATÍVEL)
 // ============================================================================
 function makeInteractable(shape) {
-    // CRUCIAL: Obriga o ecrã touch a entregar 100% dos toques ao JS
-    shape.style.touchAction = 'none'; 
+    shape.style.touchAction = 'none'; // Desativa qualquer comportamento de scroll do browser no elemento
     
-    const pointers = new Map();
     const isLine = shape.dataset.shape === 'line';
-    const baseRot = isLine ? -45 : 0; // A linha já nasce rodada
+    const baseRot = isLine ? -45 : 0;
     
-    // Estado atual do objeto
+    // Estado atual
     let currentScale = 1;
     let currentRotation = 0;
     let currentLeft = parseFloat(shape.style.left) || 0;
     let currentTop = parseFloat(shape.style.top) || 0;
 
-    // Estado inicial no momento do toque (Baselines)
+    // Estado inicial no momento do toque
     let startDist = 0;
     let startAngle = 0;
     let startScale = 1;
@@ -45,121 +43,140 @@ function makeInteractable(shape) {
         shape.style.transform = `translate(-50%, -50%) rotate(${baseRot + currentRotation}deg) scale(${currentScale})`;
     }
 
-    shape.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        shape.setPointerCapture(e.pointerId);
-        
-        // Traz o objeto para a frente
-        stage.appendChild(shape);
+    // Calcula o ponto central exato de todos os dedos que tocam no objeto
+    function getCentroid(touches) {
+        let x = 0, y = 0;
+        for (let i = 0; i < touches.length; i++) {
+            x += touches[i].clientX;
+            y += touches[i].clientY;
+        }
+        return { x: x / touches.length, y: y / touches.length };
+    }
 
-        // Calcula o centro exato entre todos os dedos a tocar (Centroid)
-        const pts = Array.from(pointers.values());
-        startPanX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
-        startPanY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+    // Grava a baseline de posições sempre que um dedo é adicionado ou removido
+    function initBaselines(touches) {
+        if (touches.length === 0) return;
+        
+        const centroid = getCentroid(touches);
+        startPanX = centroid.x;
+        startPanY = centroid.y;
         startLeft = currentLeft;
         startTop = currentTop;
 
-        // Se meter 2 dedos, grava a distância e ângulo iniciais
-        if (pointers.size === 2) {
-            startDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-            startAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * (180 / Math.PI);
+        if (touches.length >= 2) {
+            const dx = touches[1].clientX - touches[0].clientX;
+            const dy = touches[1].clientY - touches[0].clientY;
+            startDist = Math.hypot(dx, dy);
+            startAngle = Math.atan2(dy, dx) * (180 / Math.PI);
             startScale = currentScale;
             startRotation = currentRotation;
         }
-    });
+    }
 
-    shape.addEventListener('pointermove', (e) => {
-        if (!pointers.has(e.pointerId)) return;
+    // --- EVENTOS TOUCH (MESA) ---
+    shape.addEventListener('touchstart', (e) => {
+        e.preventDefault(); 
+        e.stopPropagation();
+        stage.appendChild(shape); // Traz para a frente
+        initBaselines(e.targetTouches);
+    }, { passive: false });
+
+    shape.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         
-        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        const pts = Array.from(pointers.values());
+        const touches = e.targetTouches;
+        if (touches.length === 0) return;
 
-        // MOVER (PANNING): O objeto segue sempre o ponto central dos dedos
-        const centerX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
-        const centerY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
-        
-        currentLeft = startLeft + (centerX - startPanX);
-        currentTop = startTop + (centerY - startPanY);
+        const centroid = getCentroid(touches);
 
-        // ZOOM & RODAR: Apenas quando há 2 dedos
-        if (pointers.size === 2) {
-            const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-            const currentAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * (180 / Math.PI);
+        // MOVER (PANNING): Segue o centro dos dedos
+        currentLeft = startLeft + (centroid.x - startPanX);
+        currentTop = startTop + (centroid.y - startPanY);
 
-            // Matemática do Zoom
+        // ZOOM E ROTAÇÃO (2 ou mais dedos)
+        if (touches.length >= 2) {
+            const dx = touches[1].clientX - touches[0].clientX;
+            const dy = touches[1].clientY - touches[0].clientY;
+            const currentDist = Math.hypot(dx, dy);
+            const currentAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+
             if (startDist > 0) {
                 currentScale = startScale * (currentDist / startDist);
-                currentScale = Math.max(0.3, Math.min(currentScale, 10)); // Limites de tamanho
+                currentScale = Math.max(0.3, Math.min(currentScale, 10)); // Limites
             }
 
-            // Matemática da Rotação
-            currentRotation = startRotation + (currentAngle - startAngle);
+            const deltaAngle = currentAngle - startAngle;
+            currentRotation = startRotation + deltaAngle;
         }
 
-        render(); // Aplica as transformações no ecrã
+        render();
+    }, { passive: false });
+
+    shape.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        initBaselines(e.targetTouches); // Recalcula se o utilizador levantar apenas um dedo
+    }, { passive: false });
+
+    shape.addEventListener('touchcancel', (e) => {
+        initBaselines(e.targetTouches);
+    }, { passive: false });
+
+    // --- EVENTOS DE RATO (PARA TESTES NO PC) ---
+    // Fallback para arrastar com o rato
+    let isDragging = false;
+    shape.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isDragging = true;
+        stage.appendChild(shape);
+        startPanX = e.clientX;
+        startPanY = e.clientY;
+        startLeft = currentLeft;
+        startTop = currentTop;
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        currentLeft = startLeft + (e.clientX - startPanX);
+        currentTop = startTop + (e.clientY - startPanY);
+        render();
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
     });
 
-    const releasePointer = (e) => {
-        if (!pointers.has(e.pointerId)) return;
-        pointers.delete(e.pointerId);
-        shape.releasePointerCapture(e.pointerId);
-
-        // MÁGICA DE ESTABILIDADE: Recalcula o centro se o utilizador levantar só um dedo,
-        // garantindo que o objeto não "teletransporta" para o dedo que ficou.
-        if (pointers.size > 0) {
-            const pts = Array.from(pointers.values());
-            startPanX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
-            startPanY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
-            startLeft = currentLeft;
-            startTop = currentTop;
-            
-            if (pointers.size === 2) {
-                startDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-                startAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * (180 / Math.PI);
-                startScale = currentScale;
-                startRotation = currentRotation;
-            }
-        }
-    };
-
-    shape.addEventListener('pointerup', releasePointer);
-    shape.addEventListener('pointercancel', releasePointer);
-
-    // Fallback Rato/Trackpad para testares no PC
+    // Fallback para zoom/rotacionar com Trackpad/Scroll do rato
     shape.addEventListener('wheel', (e) => {
         e.preventDefault();
         e.stopPropagation();
         if (e.shiftKey) {
-            currentRotation += e.deltaY * 0.5; // Shift para rodar
+            currentRotation += e.deltaY * 0.5;
         } else {
             const zoomSpeed = e.ctrlKey || e.metaKey ? 0.01 : 0.005;
-            currentScale -= e.deltaY * zoomSpeed; // Pinch Trackpad para Zoom
+            currentScale -= e.deltaY * zoomSpeed;
             currentScale = Math.max(0.3, Math.min(currentScale, 10));
         }
         render();
     }, { passive: false });
     
-    // Renderiza a forma na sua posição/estado inicial assim que é criada
     render();
 }
 
 // ============================================================================
-// 2. LÓGICA DE DRAG & DROP (DA BARRA LATERAL PARA O PALCO)
+// 2. DRAG & DROP DA BARRA LATERAL (SUPORTA RATO E TOUCH EM SIMULTÂNEO)
 // ============================================================================
 tools.forEach(tool => {
-    tool.addEventListener('pointerdown', (e) => {
+    // Função unificada para iniciar o arrasto da ferramenta
+    const startDrag = (clientX, clientY, identifier = null) => {
         const shapeClass = Array.from(tool.classList).find(cls => cls.startsWith('shape-'));
         const shapeType = tool.dataset.shape;
         
-        // Criação do clone "Fantasma" para arrastar
         const clone = document.createElement('div');
         clone.className = `tool ${shapeClass}`;
         clone.style.position = 'absolute';
         clone.style.zIndex = 1000;
-        clone.style.touchAction = 'none'; // Impede bugar no touch
+        clone.style.touchAction = 'none';
         
         const isLine = shapeType === 'line';
         clone.style.transform = isLine ? 'translate(-50%, -50%) rotate(-45deg)' : 'translate(-50%, -50%)';
@@ -171,44 +188,73 @@ tools.forEach(tool => {
             clone.style.top = y + 'px';
         };
         
-        moveClone(e.clientX, e.clientY);
-        tool.setPointerCapture(e.pointerId);
+        moveClone(clientX, clientY);
 
-        tool.onpointermove = (ev) => {
-            if (ev.pointerId === e.pointerId) moveClone(ev.clientX, ev.clientY);
+        // Lógica de Movimento Touch
+        const onTouchMove = (ev) => {
+            const touch = Array.from(ev.changedTouches).find(t => t.identifier === identifier);
+            if (touch) moveClone(touch.clientX, touch.clientY);
         };
 
-        const endDrag = (ev) => {
-            if (ev.pointerId !== e.pointerId) return;
-            tool.releasePointerCapture(e.pointerId);
-            tool.onpointermove = null;
-            tool.onpointerup = null;
-            tool.onpointercancel = null;
+        // Lógica de Fim de Touch
+        const onTouchEnd = (ev) => {
+            const touch = Array.from(ev.changedTouches).find(t => t.identifier === identifier);
+            if (!touch) return;
+            
+            document.removeEventListener('touchmove', onTouchMove);
+            document.removeEventListener('touchend', onTouchEnd);
+            document.removeEventListener('touchcancel', onTouchEnd);
             clone.remove();
             
-            // Só "planta" no palco se for um drop válido
-            if (ev.type === 'pointerup') {
-                const stageRect = stage.getBoundingClientRect();
-                if (ev.clientX >= stageRect.left && ev.clientX <= stageRect.right &&
-                    ev.clientY >= stageRect.top && ev.clientY <= stageRect.bottom) {
-                    
-                    const shape = document.createElement('div');
-                    shape.className = `stage-item ${shapeClass}`;
-                    shape.dataset.shape = shapeType;
-                    
-                    // Coloca exatamente debaixo do dedo
-                    shape.style.left = (ev.clientX - stageRect.left) + 'px';
-                    shape.style.top = (ev.clientY - stageRect.top) + 'px';
-                    
-                    stage.appendChild(shape);
-                    
-                    // ATIVA O MOTOR ÉPICO DE MULTITOUCH NESTA FORMA
-                    makeInteractable(shape);
-                }
-            }
+            handleDrop(touch.clientX, touch.clientY, shapeClass, shapeType);
         };
 
-        tool.onpointerup = endDrag;
-        tool.onpointercancel = endDrag; 
+        // Lógica de Movimento Rato
+        const onMouseMove = (ev) => moveClone(ev.clientX, ev.clientY);
+
+        // Lógica de Fim Rato
+        const onMouseUp = (ev) => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            clone.remove();
+            handleDrop(ev.clientX, ev.clientY, shapeClass, shapeType);
+        };
+
+        if (identifier !== null) {
+            document.addEventListener('touchmove', onTouchMove, { passive: false });
+            document.addEventListener('touchend', onTouchEnd);
+            document.addEventListener('touchcancel', onTouchEnd);
+        } else {
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+    };
+
+    const handleDrop = (clientX, clientY, shapeClass, shapeType) => {
+        const stageRect = stage.getBoundingClientRect();
+        if (clientX >= stageRect.left && clientX <= stageRect.right &&
+            clientY >= stageRect.top && clientY <= stageRect.bottom) {
+            
+            const shape = document.createElement('div');
+            shape.className = `stage-item ${shapeClass}`;
+            shape.dataset.shape = shapeType;
+            shape.style.left = (clientX - stageRect.left) + 'px';
+            shape.style.top = (clientY - stageRect.top) + 'px';
+            
+            stage.appendChild(shape);
+            makeInteractable(shape);
+        }
+    };
+
+    // Listeners independentes para garantir deteção no Safari
+    tool.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.changedTouches[0];
+        startDrag(touch.clientX, touch.clientY, touch.identifier);
+    }, { passive: false });
+
+    tool.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        startDrag(e.clientX, e.clientY, null);
     });
 });
