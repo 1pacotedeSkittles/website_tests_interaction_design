@@ -1,60 +1,169 @@
 // ============================================================================
-// 0. BLOQUEIO ABSOLUTO DO ZOOM E SCROLL DA JANELA (PÁGINA)
+// 0. PROTEÇÃO MÁXIMA CONTRA ZOOM NATIVO DO BROWSER
 // ============================================================================
-
-// Bloqueia o zoom no trackpad/rato (Ctrl + Wheel) no ecrã inteiro
-document.addEventListener('wheel', (e) => {
-    if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-    }
-}, { passive: false });
-
-// Bloqueia o Pinch-to-Zoom nativo em ecrãs touch (Android/Windows)
-document.addEventListener('touchmove', (e) => {
-    if (e.touches.length > 1) {
-        e.preventDefault(); 
-    }
-}, { passive: false });
-
-// Bloqueia o Pinch-to-Zoom nativo no iOS/iPadOS Safari (eventos proprietários)
-document.addEventListener('gesturestart', (e) => {
-    e.preventDefault();
-});
-document.addEventListener('gesturechange', (e) => {
-    e.preventDefault();
-});
+document.addEventListener('wheel', (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive: false });
+document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
 
 const tools = document.querySelectorAll('.tool');
 const stage = document.getElementById('stage');
 
+// Garantir que as ferramentas da barra também não ativam scrolls nativos
+tools.forEach(tool => tool.style.touchAction = 'none');
+
 // ============================================================================
-// FUNÇÃO CENTRAL PARA APLICAR ZOOM E ROTAÇÃO NO ELEMENTO
+// 1. O MOTOR DE GESTOS MULTITOQUE (COZINHADO DE FORMA ÉPICA)
 // ============================================================================
-function updateTransform(element) {
-    const isLine = element.dataset.shape === 'line';
-    const baseRotation = isLine ? -45 : 0; 
+function makeInteractable(shape) {
+    // CRUCIAL: Obriga o ecrã touch a entregar 100% dos toques ao JS
+    shape.style.touchAction = 'none'; 
     
-    const currentRotation = element._rotation || 0;
-    const finalRotation = baseRotation + currentRotation;
-    const scale = element._scale || 1;
+    const pointers = new Map();
+    const isLine = shape.dataset.shape === 'line';
+    const baseRot = isLine ? -45 : 0; // A linha já nasce rodada
     
-    element.style.transform = `translate(-50%, -50%) rotate(${finalRotation}deg) scale(${scale})`;
+    // Estado atual do objeto
+    let currentScale = 1;
+    let currentRotation = 0;
+    let currentLeft = parseFloat(shape.style.left) || 0;
+    let currentTop = parseFloat(shape.style.top) || 0;
+
+    // Estado inicial no momento do toque (Baselines)
+    let startDist = 0;
+    let startAngle = 0;
+    let startScale = 1;
+    let startRotation = 0;
+    let startPanX = 0;
+    let startPanY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function render() {
+        shape.style.left = `${currentLeft}px`;
+        shape.style.top = `${currentTop}px`;
+        shape.style.transform = `translate(-50%, -50%) rotate(${baseRot + currentRotation}deg) scale(${currentScale})`;
+    }
+
+    shape.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        shape.setPointerCapture(e.pointerId);
+        
+        // Traz o objeto para a frente
+        stage.appendChild(shape);
+
+        // Calcula o centro exato entre todos os dedos a tocar (Centroid)
+        const pts = Array.from(pointers.values());
+        startPanX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+        startPanY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+        startLeft = currentLeft;
+        startTop = currentTop;
+
+        // Se meter 2 dedos, grava a distância e ângulo iniciais
+        if (pointers.size === 2) {
+            startDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+            startAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * (180 / Math.PI);
+            startScale = currentScale;
+            startRotation = currentRotation;
+        }
+    });
+
+    shape.addEventListener('pointermove', (e) => {
+        if (!pointers.has(e.pointerId)) return;
+        
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const pts = Array.from(pointers.values());
+
+        // MOVER (PANNING): O objeto segue sempre o ponto central dos dedos
+        const centerX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+        const centerY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+        
+        currentLeft = startLeft + (centerX - startPanX);
+        currentTop = startTop + (centerY - startPanY);
+
+        // ZOOM & RODAR: Apenas quando há 2 dedos
+        if (pointers.size === 2) {
+            const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+            const currentAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * (180 / Math.PI);
+
+            // Matemática do Zoom
+            if (startDist > 0) {
+                currentScale = startScale * (currentDist / startDist);
+                currentScale = Math.max(0.3, Math.min(currentScale, 10)); // Limites de tamanho
+            }
+
+            // Matemática da Rotação
+            currentRotation = startRotation + (currentAngle - startAngle);
+        }
+
+        render(); // Aplica as transformações no ecrã
+    });
+
+    const releasePointer = (e) => {
+        if (!pointers.has(e.pointerId)) return;
+        pointers.delete(e.pointerId);
+        shape.releasePointerCapture(e.pointerId);
+
+        // MÁGICA DE ESTABILIDADE: Recalcula o centro se o utilizador levantar só um dedo,
+        // garantindo que o objeto não "teletransporta" para o dedo que ficou.
+        if (pointers.size > 0) {
+            const pts = Array.from(pointers.values());
+            startPanX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+            startPanY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+            startLeft = currentLeft;
+            startTop = currentTop;
+            
+            if (pointers.size === 2) {
+                startDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                startAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * (180 / Math.PI);
+                startScale = currentScale;
+                startRotation = currentRotation;
+            }
+        }
+    };
+
+    shape.addEventListener('pointerup', releasePointer);
+    shape.addEventListener('pointercancel', releasePointer);
+
+    // Fallback Rato/Trackpad para testares no PC
+    shape.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.shiftKey) {
+            currentRotation += e.deltaY * 0.5; // Shift para rodar
+        } else {
+            const zoomSpeed = e.ctrlKey || e.metaKey ? 0.01 : 0.005;
+            currentScale -= e.deltaY * zoomSpeed; // Pinch Trackpad para Zoom
+            currentScale = Math.max(0.3, Math.min(currentScale, 10));
+        }
+        render();
+    }, { passive: false });
+    
+    // Renderiza a forma na sua posição/estado inicial assim que é criada
+    render();
 }
 
 // ============================================================================
-// 1. DRAG AND DROP DA BARRA LATERAL PARA O PALCO
+// 2. LÓGICA DE DRAG & DROP (DA BARRA LATERAL PARA O PALCO)
 // ============================================================================
 tools.forEach(tool => {
     tool.addEventListener('pointerdown', (e) => {
-        
         const shapeClass = Array.from(tool.classList).find(cls => cls.startsWith('shape-'));
         const shapeType = tool.dataset.shape;
         
+        // Criação do clone "Fantasma" para arrastar
         const clone = document.createElement('div');
         clone.className = `tool ${shapeClass}`;
-        clone.dataset.shape = shapeType;
         clone.style.position = 'absolute';
-        clone.style.zIndex = 1000; 
+        clone.style.zIndex = 1000;
+        clone.style.touchAction = 'none'; // Impede bugar no touch
+        
+        const isLine = shapeType === 'line';
+        clone.style.transform = isLine ? 'translate(-50%, -50%) rotate(-45deg)' : 'translate(-50%, -50%)';
+        
         document.body.appendChild(clone);
 
         const moveClone = (x, y) => {
@@ -62,7 +171,6 @@ tools.forEach(tool => {
             clone.style.top = y + 'px';
         };
         
-        updateTransform(clone);
         moveClone(e.clientX, e.clientY);
         tool.setPointerCapture(e.pointerId);
 
@@ -78,6 +186,7 @@ tools.forEach(tool => {
             tool.onpointercancel = null;
             clone.remove();
             
+            // Só "planta" no palco se for um drop válido
             if (ev.type === 'pointerup') {
                 const stageRect = stage.getBoundingClientRect();
                 if (ev.clientX >= stageRect.left && ev.clientX <= stageRect.right &&
@@ -86,17 +195,15 @@ tools.forEach(tool => {
                     const shape = document.createElement('div');
                     shape.className = `stage-item ${shapeClass}`;
                     shape.dataset.shape = shapeType;
+                    
+                    // Coloca exatamente debaixo do dedo
                     shape.style.left = (ev.clientX - stageRect.left) + 'px';
                     shape.style.top = (ev.clientY - stageRect.top) + 'px';
                     
-                    shape._scale = 1;
-                    shape._rotation = 0; 
-                    
-                    updateTransform(shape);
                     stage.appendChild(shape);
                     
-                    shape.addEventListener('pointerdown', handleShapePointerDown);
-                    shape.addEventListener('wheel', handleShapeWheel, { passive: false });
+                    // ATIVA O MOTOR ÉPICO DE MULTITOUCH NESTA FORMA
+                    makeInteractable(shape);
                 }
             }
         };
@@ -105,99 +212,3 @@ tools.forEach(tool => {
         tool.onpointercancel = endDrag; 
     });
 });
-
-// ============================================================================
-// 2. MOVER, ZOOM E RODAR (MULTITOQUE 2 DEDOS) NOS ELEMENTOS DO PALCO
-// ============================================================================
-function handleShapePointerDown(e) {
-    const shape = e.currentTarget;
-    const stageRect = stage.getBoundingClientRect();
-    
-    if (!shape._pointers) shape._pointers = new Map();
-    shape._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-    stage.appendChild(shape); 
-    shape.setPointerCapture(e.pointerId);
-
-    let initialDistance = 0;
-    let initialScale = shape._scale || 1;
-    let initialAngle = 0;
-    let initialRotation = shape._rotation || 0;
-
-    if (shape._pointers.size === 2) {
-        const pts = Array.from(shape._pointers.values());
-        
-        initialDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        initialAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * (180 / Math.PI);
-    }
-
-    shape.onpointermove = (ev) => {
-        if (!shape._pointers.has(ev.pointerId)) return;
-        shape._pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-
-        if (shape._pointers.size === 1) {
-            // MOVER (1 Dedo)
-            shape.style.left = (ev.clientX - stageRect.left) + 'px';
-            shape.style.top = (ev.clientY - stageRect.top) + 'px';
-        } 
-        else if (shape._pointers.size === 2) {
-            // ZOOM E ROTAÇÃO (2 Dedos)
-            const pts = Array.from(shape._pointers.values());
-            
-            const currentDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-            const currentAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * (180 / Math.PI);
-
-            if (initialDistance > 0) {
-                // Aplica Zoom apenas no Elemento
-                shape._scale = initialScale * (currentDistance / initialDistance);
-                shape._scale = Math.max(0.3, Math.min(shape._scale, 10)); 
-                
-                // Aplica Rotação apenas no Elemento
-                const deltaAngle = currentAngle - initialAngle;
-                shape._rotation = initialRotation + deltaAngle;
-
-                updateTransform(shape);
-            }
-        }
-    };
-
-    const endPointer = (ev) => {
-        shape._pointers.delete(ev.pointerId);
-        shape.releasePointerCapture(ev.pointerId);
-        
-        if (shape._pointers.size === 0) {
-            shape.onpointermove = null;
-            shape.onpointerup = null;
-            shape.onpointercancel = null;
-        } else if (shape._pointers.size === 1) {
-            const remainingId = shape._pointers.keys().next().value;
-            shape._pointers.set(remainingId, { x: ev.clientX, y: ev.clientY });
-        }
-    };
-
-    shape.onpointerup = endPointer;
-    shape.onpointercancel = endPointer;
-}
-
-// ============================================================================
-// 3. ZOOM / ROTATION POR TRACKPAD/RATO 
-// ============================================================================
-function handleShapeWheel(e) {
-    e.preventDefault(); 
-    e.stopPropagation();
-
-    const shape = e.currentTarget;
-    if (!shape._scale) shape._scale = 1;
-    if (!shape._rotation) shape._rotation = 0;
-    
-    if (e.shiftKey) {
-        const rotationSpeed = 0.5;
-        shape._rotation += e.deltaY * rotationSpeed;
-    } else {
-        const zoomSpeed = e.ctrlKey || e.metaKey ? 0.01 : 0.005;
-        shape._scale -= e.deltaY * zoomSpeed;
-        shape._scale = Math.max(0.3, Math.min(shape._scale, 10));
-    }
-    
-    updateTransform(shape);
-}
