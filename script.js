@@ -1,14 +1,3 @@
-// ============================================================================
-// BLOQUEIO GLOBAL DO ZOOM NATIVO DA PÁGINA
-// ============================================================================
-document.addEventListener('wheel', (e) => {
-    if (e.ctrlKey || e.metaKey || e.shiftKey) e.preventDefault();
-}, { passive: false });
-
-document.addEventListener('touchmove', (e) => {
-    if (e.touches.length > 1) e.preventDefault();
-}, { passive: false });
-
 const tools = document.querySelectorAll('.tool');
 const stage = document.getElementById('stage');
 
@@ -17,7 +6,7 @@ const stage = document.getElementById('stage');
 // ============================================================================
 function updateTransform(element) {
     const isLine = element.dataset.shape === 'line';
-    const baseRotation = isLine ? -45 : 0; // A linha já começa inclinada a -45 graus
+    const baseRotation = isLine ? -45 : 0; 
     
     const currentRotation = element._rotation || 0;
     const finalRotation = baseRotation + currentRotation;
@@ -31,11 +20,12 @@ function updateTransform(element) {
 // ============================================================================
 tools.forEach(tool => {
     tool.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
+        // AVISO: Não usar e.preventDefault() aqui! Quebra os ecrãs touch.
         
         const shapeClass = Array.from(tool.classList).find(cls => cls.startsWith('shape-'));
         const shapeType = tool.dataset.shape;
         
+        // Cria clone visual para arrastar
         const clone = document.createElement('div');
         clone.className = `tool ${shapeClass}`;
         clone.dataset.shape = shapeType;
@@ -56,34 +46,43 @@ tools.forEach(tool => {
             if (ev.pointerId === e.pointerId) moveClone(ev.clientX, ev.clientY);
         };
 
-        tool.onpointerup = (ev) => {
+        // Função que corre quando levantamos o dedo ou o toque falha
+        const endDrag = (ev) => {
             if (ev.pointerId !== e.pointerId) return;
             tool.releasePointerCapture(e.pointerId);
             tool.onpointermove = null;
             tool.onpointerup = null;
+            tool.onpointercancel = null;
             clone.remove();
             
-            const stageRect = stage.getBoundingClientRect();
-            if (ev.clientX >= stageRect.left && ev.clientX <= stageRect.right &&
-                ev.clientY >= stageRect.top && ev.clientY <= stageRect.bottom) {
-                
-                const shape = document.createElement('div');
-                shape.className = `stage-item ${shapeClass}`;
-                shape.dataset.shape = shapeType;
-                shape.style.left = (ev.clientX - stageRect.left) + 'px';
-                shape.style.top = (ev.clientY - stageRect.top) + 'px';
-                
-                // Inicializa variáveis de controlo
-                shape._scale = 1;
-                shape._rotation = 0; 
-                
-                updateTransform(shape);
-                stage.appendChild(shape);
-                
-                shape.addEventListener('pointerdown', handleShapePointerDown);
-                shape.addEventListener('wheel', handleShapeWheel, { passive: false });
+            // Só adiciona ao palco se o toque não tiver sido abortado (pointercancel)
+            if (ev.type === 'pointerup') {
+                const stageRect = stage.getBoundingClientRect();
+                if (ev.clientX >= stageRect.left && ev.clientX <= stageRect.right &&
+                    ev.clientY >= stageRect.top && ev.clientY <= stageRect.bottom) {
+                    
+                    const shape = document.createElement('div');
+                    shape.className = `stage-item ${shapeClass}`;
+                    shape.dataset.shape = shapeType;
+                    shape.style.left = (ev.clientX - stageRect.left) + 'px';
+                    shape.style.top = (ev.clientY - stageRect.top) + 'px';
+                    
+                    // Inicializa propriedades da forma no palco
+                    shape._scale = 1;
+                    shape._rotation = 0; 
+                    
+                    updateTransform(shape);
+                    stage.appendChild(shape);
+                    
+                    // Adiciona os eventos para interagir com a forma
+                    shape.addEventListener('pointerdown', handleShapePointerDown);
+                    shape.addEventListener('wheel', handleShapeWheel, { passive: false });
+                }
             }
         };
+
+        tool.onpointerup = endDrag;
+        tool.onpointercancel = endDrag; // Crucial para estabilidade em mesas touch
     });
 });
 
@@ -91,31 +90,29 @@ tools.forEach(tool => {
 // 2. MOVER, ZOOM E RODAR (MULTITOQUE 2 DEDOS) NOS ELEMENTOS DO PALCO
 // ============================================================================
 function handleShapePointerDown(e) {
-    e.preventDefault();
+    // Sem e.preventDefault(); aqui também para não bloquear touch
     const shape = e.currentTarget;
     const stageRect = stage.getBoundingClientRect();
     
     if (!shape._pointers) shape._pointers = new Map();
     shape._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    stage.appendChild(shape); // Traz para primeiro plano
+    stage.appendChild(shape); // Traz a forma para a frente das outras
     shape.setPointerCapture(e.pointerId);
 
-    // Variáveis para guardar o estado antes de começar a mover os dedos
     let initialDistance = 0;
     let initialScale = shape._scale || 1;
     let initialAngle = 0;
     let initialRotation = shape._rotation || 0;
 
-    // Se há 2 dedos, calcula a distância e o ângulo inicial entre eles
+    // Se temos 2 dedos a tocar na forma, calcula a distância e ângulo iniciais
     if (shape._pointers.size === 2) {
         const pts = Array.from(shape._pointers.values());
         
         // Teorema de Pitágoras para a Distância (Zoom)
         initialDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
         
-        // Arco-tangente para calcular o Ângulo entre os 2 dedos (Rotação)
-        // Convertido de Radianos para Graus
+        // Arco-tangente para o Ângulo entre os 2 dedos (Rotação) em Graus
         initialAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * (180 / Math.PI);
     }
 
@@ -124,24 +121,23 @@ function handleShapePointerDown(e) {
         shape._pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
 
         if (shape._pointers.size === 1) {
-            // MOVER (1 Dedo)
+            // --- MOVER (1 Dedo) ---
             shape.style.left = (ev.clientX - stageRect.left) + 'px';
             shape.style.top = (ev.clientY - stageRect.top) + 'px';
         } 
         else if (shape._pointers.size === 2) {
-            // ZOOM E ROTAÇÃO (2 Dedos)
+            // --- ZOOM E ROTAÇÃO (2 Dedos) ---
             const pts = Array.from(shape._pointers.values());
             
-            // Distância Atual e Ângulo Atual
             const currentDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
             const currentAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * (180 / Math.PI);
 
             if (initialDistance > 0) {
-                // Cálculo da Escala (Zoom)
+                // Cálculo de Zoom
                 shape._scale = initialScale * (currentDistance / initialDistance);
-                shape._scale = Math.max(0.3, Math.min(shape._scale, 10)); 
+                shape._scale = Math.max(0.3, Math.min(shape._scale, 10)); // Limites min/max
                 
-                // Cálculo da Rotação
+                // Cálculo de Rotação
                 const deltaAngle = currentAngle - initialAngle;
                 shape._rotation = initialRotation + deltaAngle;
 
@@ -159,6 +155,7 @@ function handleShapePointerDown(e) {
             shape.onpointerup = null;
             shape.onpointercancel = null;
         } else if (shape._pointers.size === 1) {
+            // Recalcula a posição do dedo que fica no ecrã para evitar um "salto" visual
             const remainingId = shape._pointers.keys().next().value;
             shape._pointers.set(remainingId, { x: ev.clientX, y: ev.clientY });
         }
@@ -169,7 +166,7 @@ function handleShapePointerDown(e) {
 }
 
 // ============================================================================
-// 3. ZOOM / ROTATION POR TRACKPAD/RATO NO ELEMENTO
+// 3. ZOOM / ROTATION POR TRACKPAD/RATO (Apenas para desenvolvimento no PC)
 // ============================================================================
 function handleShapeWheel(e) {
     e.preventDefault(); 
@@ -180,11 +177,11 @@ function handleShapeWheel(e) {
     if (!shape._rotation) shape._rotation = 0;
     
     if (e.shiftKey) {
-        // ROTAÇÃO (Shift + Scroll)
+        // ROTAÇÃO: Shift + Scroll
         const rotationSpeed = 0.5;
         shape._rotation += e.deltaY * rotationSpeed;
     } else {
-        // ZOOM (Pinch no Trackpad ou Scroll normal)
+        // ZOOM: Scroll normal ou Pinch de Trackpad (ativam ctrl/meta)
         const zoomSpeed = e.ctrlKey || e.metaKey ? 0.01 : 0.005;
         shape._scale -= e.deltaY * zoomSpeed;
         shape._scale = Math.max(0.3, Math.min(shape._scale, 10));

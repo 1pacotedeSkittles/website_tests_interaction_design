@@ -2,8 +2,12 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    
+    /* BLOQUEIOS NATIVOS PARA ECRÃS TOUCH */
     user-select: none; 
-    touch-action: none; 
+    -webkit-user-select: none; /* Essencial para algumas superfícies como iOS/iPadOS/Telas Touch */
+    -webkit-touch-callout: none; /* Bloqueia menus de contexto (popups de toque longo) */
+    touch-action: none; /* A MAGIA ACONTECE AQUI: O browser entrega todos os toques ao JavaScript sem tentar fazer scroll */
 }
 
 html, body {
@@ -11,7 +15,7 @@ html, body {
     height: 100%;
     background-color: #2a2a2a;
     overflow: hidden;
-    overscroll-behavior: none; 
+    overscroll-behavior: none; /* Bloqueia o "efeito elástico" ao chegar às pontas do ecrã */
 }
 
 body {
@@ -31,6 +35,7 @@ body {
     overflow: hidden;
 }
 
+/* --- BARRA LATERAL --- */
 .sidebar {
     width: 80px;
     min-width: 80px;
@@ -45,6 +50,7 @@ body {
     z-index: 10;
 }
 
+/* --- PALCO --- */
 .stage {
     flex: 1;
     position: relative;
@@ -52,6 +58,7 @@ body {
     overflow: hidden; 
 }
 
+/* --- ESTILO GERAL DAS FORMAS --- */
 .tool, .stage-item {
     cursor: grab;
     transform-origin: center center; 
@@ -60,12 +67,36 @@ body {
     cursor: grabbing;
 }
 
-/* --- FORMAS --- */
-.shape-circle { width: 40px; height: 40px; background-color: #333; border-radius: 50%; }
-.shape-square { width: 36px; height: 36px; background-color: #333; }
-.shape-triangle { width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-bottom: 35px solid #333; }
-.shape-line { width: 45px; height: 4px; background-color: #333; transform: rotate(-45deg); }
+/* --- DESENHO DAS FORMAS (CSS) --- */
+.shape-circle { 
+    width: 40px; 
+    height: 40px; 
+    background-color: #333; 
+    border-radius: 50%; 
+}
 
+.shape-square { 
+    width: 36px; 
+    height: 36px; 
+    background-color: #333; 
+}
+
+.shape-triangle { 
+    width: 0; 
+    height: 0; 
+    border-left: 20px solid transparent; 
+    border-right: 20px solid transparent; 
+    border-bottom: 35px solid #333; 
+}
+
+.shape-line { 
+    width: 45px; 
+    height: 4px; 
+    background-color: #333; 
+    transform: rotate(-45deg); 
+}
+
+/* --- FORMAS QUANDO ESTÃO NO PALCO --- */
 .stage-item {
     position: absolute;
     transform: translate(-50%, -50%);
