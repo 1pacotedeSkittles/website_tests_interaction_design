@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Teatro de Sombras</title>
+</head>
+
+<body>
+	<main class="app">
+
+		<section id="build-phase" class="phase phase--build" aria-label="Build phase">
+			<header class="build__header">
+				<span class="build__help" aria-label="Help">?</span>
+				<input class="build__slider" type="range" min="0" max="100" value="0"
+				aria-label="Help_slider">
+			</header>
+
+			<span class="build__delete" aria-label="Delete selected">
+				<svg viewBox="0 0 24 24" aria-hidden="true">
+					<path d="M9 3h6M4 6h16M6 6v14h12V6M10 10v7M14 10v7"
+					fill="none" stroke="currentColor" stroke-width="2"
+					stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+			</span>
+
+			<div class="build__toolbar" role="toolbar" aria-orientation="vertical" aria-label="Shapes">
+				<button class="build__tool" type="button" data-tool="circle" aria-label="Circle" aria-pressed="false">
+				<svg viewBox="0 0 100 100" aria-hidden="true">
+					<circle cx="50" cy="50" r="48" fill="currentColor"/>
+				</svg>
+				</button>
+
+				<button class="build__tool" type="button" data-tool="triangle" aria-label="Triangle" aria-pressed="false">
+				<svg viewBox="0 0 100 100" aria-hidden="true">
+					<polygon points="50,5 98,92 2,92" fill="currentColor"/>
+				</svg>
+				</button>
+
+				<button class="build__tool" type="button" data-tool="square" aria-label="Square" aria-pressed="false">
+				<svg viewBox="0 0 100 100" aria-hidden="true">
+					<rect x="8" y="8" width="84" height="84" fill="currentColor"/>
+				</svg>
+				</button>
+
+				<button class="build__tool" type="button" data-tool="line" aria-label="Line" aria-pressed="false">
+				<svg viewBox="0 0 100 100" aria-hidden="true">
+					<line x1="15" y1="15" x2="85" y2="85" stroke="currentColor" stroke-width="5"/>
+				</svg>
+				</button>
+
+				<button class="build__tool" type="button" data-tool="target" aria-label="Target" aria-pressed="false">
+				<svg viewBox="0 0 100 100" aria-hidden="true">
+					<circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" stroke-width="1.5"/>
+					<circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="1.5"/>
+					<circle cx="50" cy="50" r="18" fill="currentColor"/>
+				</svg>
+				</button>
+			</div>
+
+			<div id="build-canvas" class="build__canvas" aria-label="Build area"></div>
+			<button class="build__ready" type="button">READY</button>
+		</section>
+
+
+	<!-- ========================================================
+		2. ARMAZENAMENTO DE MARIONETAS (meio)
+		======================================================== -->
+	<section id="puppet-storage" class="storage" aria-labelledby="storage-title">
+	<h2 id="storage-title" class="storage__title">PUPPETS</h2>
+
+	<ol class="storage__list">
+		<li class="storage__slot" data-slot="1">
+		<button class="storage__remove" type="button" aria-label="Remove puppet 1">×</button>
+		</li>
+		<li class="storage__slot" data-slot="2">
+		<button class="storage__remove" type="button" aria-label="Remove puppet 2">×</button>
+		</li>
+		<li class="storage__slot" data-slot="3">
+		<button class="storage__remove" type="button" aria-label="Remove puppet 3">×</button>
+		</li>
+	</ol>
+	</section>
+
+
+	<!-- ========================================================
+		3. FASE DE MANIPULAÇÃO
+		======================================================== -->
+	<section id="manipulate-phase" class="phase phase--manipulate" aria-label="Manipulation phase">
+
+	<!-- Barra superior: um controlo por cor -->
+	<div class="manipulate__controls">
+
+		<div class="manipulate__control" data-channel="pink">
+		<span class="manipulate__swatch" aria-hidden="true"></span>
+		<input class="manipulate__slider" type="range" min="0" max="100" value="0"
+				aria-label="Pink control">
+		</div>
+
+		<div class="manipulate__control" data-channel="green">
+		<span class="manipulate__swatch" aria-hidden="true"></span>
+		<input class="manipulate__slider" type="range" min="0" max="100" value="0"
+				aria-label="Green control">
+		</div>
+
+		<div class="manipulate__control" data-channel="blue">
+		<span class="manipulate__swatch" aria-hidden="true"></span>
+		<input class="manipulate__slider" type="range" min="0" max="100" value="0"
+				aria-label="Blue control">
+		</div>
+
+	</div>
+
+	<!-- Área onde a marioneta é manipulada -->
+	<div id="manipulate-stage" class="manipulate__stage" aria-label="Manipulation area"></div>
+	</section>
+
+</main>
+
+</body>
+</html>
