@@ -13,9 +13,18 @@
 
 		<section id="build-phase" class="phase phase--build" aria-label="Build phase">
 			<header class="build__header">
-				<span class="build__help" aria-label="Help">?</span>
-				<input class="build__slider" type="range" min="0" max="100" value="0"
-				aria-label="Help_slider">
+				<div class="instructions__group">
+					<span class="build__help" aria-label="Help">?</span>
+					<input class="build__slider" type="range" min="0" max="100" value="0"
+					aria-label="Help_slider">
+					<ol class="instructions__list">
+    					<li class="instructions__card" style="--i: 0">
+      					<!-- <img src="img/step1.png" alt="Passo 1: ..."> -->
+						</li>
+						<li class="instructions__card" style="--i: 1"></li>
+						<li class="instructions__card" style="--i: 2"></li>
+					</ol>
+				</div>
 				<span class="build__delete" aria-label="Delete selected">
 				<svg viewBox="0 0 24 24" aria-hidden="true">
 					<path d="M9 3h6M4 6h16M6 6v14h12V6M10 10v7M14 10v7"
