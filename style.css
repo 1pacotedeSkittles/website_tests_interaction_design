@@ -1,7 +1,7 @@
 * {
 	box-sizing: border-box;
 	margin: 0;
-	padding: 0;
+	padding:0;
 }
 
 html,
@@ -14,46 +14,62 @@ body {
 	font-family: system-ui, sans-serif;
 }
 .app{
+	display: flex;
+	height: 100dvh;
+	gap:16px;
+
+	.phase { flex: 1; min-width: 0;}
+	.storage { flex: 0 0 15vw;}
+
+	.phase--build {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "header  header"
+      "toolbar canvas";
+    position: relative;
+    min-width: 0;
+	max-width:45%;
+  	}
 
 	.build__header{
-		display:flex;
-		width:45vw;
-		height:5vh;
+		grid-area: header;
+    	display: flex;
 
 		.instructions__group{
-			margin:0;
-			padding:0;
-			width:auto;
-			height:100%;
-			border:1px solid black;
+			position: relative;
+      		width: 10vw;
 
 			.instructions__list {
+				position: absolute;
+      			top: 100%;
+      			left: 0;
+      			width: 100%;
 				--progress:0;
   				display: flex;
-				flex-direction: column;   /* uma por baixo da outra */
+				flex-direction: column;
 				gap: 8px;
 				margin-top: 8px;
 				list-style: none;
 			}
 
 			.instructions__card {
+				width: 25%;
+      			height: auto;
 				--reveal: clamp(0, var(--progress) * 3 - var(--i), 1);
-				aspect-ratio: 1;          /* quadrado, mantém a forma quando puseres a imagem */
+				aspect-ratio: 1;
 				background: #f2f2f2;
-				width:50%;
-				height:50%;
 				border: 1px dashed black;
 				border-radius: 8px;
-				overflow: hidden;         /* corta a imagem nos cantos arredondados */
+				overflow: hidden;
 				opacity: var(--reveal);
   				transform: translateY(calc((1 - var(--reveal)) * -12px));
-			}
-
-			/* quando adicionares a imagem, ela enche o card */
-			.instructions__card img {
-				width: 100%;
-				height: 100%;
-				object-fit: contain;
+				img {
+					width: 100%;
+					height: 100%;
+					object-fit: contain;
+				}
 			}
 		}
 
@@ -63,7 +79,6 @@ body {
 			place-items: center;
 			width: auto;
 			height: 24px;
-			border: 1px solid black;
 
 			svg {
   			width: 100%;
@@ -71,4 +86,51 @@ body {
 			}
 		}
 	}
+
+	.build__toolbar{
+		grid-area: toolbar;
+		display:flex;
+		flex-direction:column;
+		width:10vw;
+		height:50vh;
+		justify-content: space-evenly;
+    	align-items: left;
+		margin-top:20vh;
+		gap:8px;
+		padding:8px;
+
+		.build__tool{
+			width: 4vw;
+      		aspect-ratio: 1;
+      		display: grid;
+      		place-items: center;
+		}
+
+		.build__tool svg {
+      		width: 100%;
+      		height: 100%;
+    	}
+  	}
+
+  	.build__canvas {
+    	grid-area: canvas;
+  	}
+
+	.build__ready {
+		position: absolute;
+		right: 0vw;
+		bottom: 4vh;
+		padding: 12px 32px;
+		font-size: 1.5rem;
+		font-weight: 700;
+		background: #b8f7c8;
+		border: 0;
+		border-radius: 8px;
+		cursor: pointer;
+	}
+
+	.storage {
+		width:15vw;
+	}
+
 }
