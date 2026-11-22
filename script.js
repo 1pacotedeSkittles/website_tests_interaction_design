@@ -2,6 +2,7 @@ const slider = document.querySelector(".build__slider");
 const list  = document.querySelector(".instructions__list");
 const canvas = document.querySelector("#build-canvas");
 const tools  = document.querySelectorAll(".build__tool");
+const trash = document.querySelector(".build__delete");
 
 const SHAPE_SIZE = 80;
 let topZ = 1; 
@@ -55,6 +56,15 @@ function beginDrag(shape, e, grab, isNew) {
       if (isNew) shape.remove();                  // forma nova largada fora: descarta
       else Object.assign(shape.style, prev);      // forma antiga: volta onde estava
     }
+    //se arrasta para o lixo apaga !
+    const t = trash.getBoundingClientRect();
+    const overTrash = cx >= t.left - 20 && cx <= t.right + 20 &&
+                      cy >= t.top  - 20 && cy <= t.bottom + 20;
+
+    if (overTrash) {
+      shape.remove();
+      return;
+    }
   }
 
   shape.addEventListener("pointermove", move);
@@ -72,6 +82,8 @@ tools.forEach((tool) => {
     beginDrag(shape, e, { x: SHAPE_SIZE / 2, y: SHAPE_SIZE / 2 }, true);
   });
 });
+
+
 
 slider.addEventListener("input", updateProgress);
 updateProgress();
