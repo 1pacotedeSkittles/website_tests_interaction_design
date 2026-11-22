@@ -83,7 +83,83 @@ tools.forEach((tool) => {
   });
 });
 
+canvas.addEventListener("pointerdown", (e) => {
+  if (e.target !== canvas) return;               // só no fundo vazio
 
+  const rect = canvas.getBoundingClientRect();
+  const clamp = (v, max) => Math.max(0, Math.min(v, max));
+  const startX = clamp(e.clientX - rect.left, rect.width);
+  const startY = clamp(e.clientY - rect.top, rect.height);
+
+  const frame = document.createElement("div");
+  frame.className = "frame";
+  canvas.append(frame);
+  canvas.setPointerCapture(e.pointerId);
+
+  function move(ev) {
+    const x = clamp(ev.clientX - rect.left, rect.width);
+    const y = clamp(ev.clientY - rect.top, rect.height);
+    frame.style.left   = `${Math.min(startX, x)}px`;
+    frame.style.top    = `${Math.min(startY, y)}px`;
+    frame.style.width  = `${Math.abs(x - startX)}px`;
+    frame.style.height = `${Math.abs(y - startY)}px`;
+  }
+
+  function end() {
+    canvas.removeEventListener("pointermove", move);
+    canvas.removeEventListener("pointerup", end);
+    canvas.removeEventListener("pointercancel", end);
+
+    // moldura minúscula = toque sem querer: descarta
+    if (frame.offsetWidth < 60 || frame.offsetHeight < 60) {
+      frame.remove();
+      return;
+    }
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "frame__ready";
+    btn.textContent = "READY";
+    btn.addEventListener("click", () => finishPuppet(frame));
+    frame.append(btn);
+
+      const close = document.createElement("button");
+    close.type = "button";
+    close.className = "frame__close";
+    close.textContent = "×";
+    close.setAttribute("aria-label", "Remove selection");
+    close.addEventListener("click", () => frame.remove());
+    frame.append(close);
+  }
+
+  canvas.addEventListener("pointermove", move);
+  canvas.addEventListener("pointerup", end);
+  canvas.addEventListener("pointercancel", end);
+});
+
+// Apanha as formas que estão dentro da moldura e fecha-as como marioneta
+function finishPuppet(frame) {
+  const f = frame.getBoundingClientRect();
+  const inside = [...canvas.querySelectorAll(".shape")].filter((s) => {
+    const r = s.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    return cx >= f.left && cx <= f.right && cy >= f.top && cy <= f.bottom;
+  });
+
+  const puppet = inside.map((s) => {
+    const r = s.getBoundingClientRect();
+    return {
+      type: s.dataset.type,
+      x: (r.left - f.left) / f.width,    // posição relativa à moldura (0 a 1)
+      y: (r.top  - f.top)  / f.height,
+    };
+  });
+
+  console.log(puppet);          // por agora só mostramos na consola
+  inside.forEach((s) => s.remove());
+  frame.remove();
+}
 
 slider.addEventListener("input", updateProgress);
 updateProgress();
