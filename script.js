@@ -3,6 +3,8 @@ const list  = document.querySelector(".instructions__list");
 const canvas = document.querySelector("#build-canvas");
 const tools  = document.querySelectorAll(".build__tool");
 const trash = document.querySelector(".build__delete");
+const slots   = document.querySelectorAll(".storage__slot");
+const puppets = [];
 
 const SHAPE_SIZE = 80;
 let topZ = 1; 
@@ -135,31 +137,89 @@ canvas.addEventListener("pointerdown", (e) => {
   canvas.addEventListener("pointermove", move);
   canvas.addEventListener("pointerup", end);
   canvas.addEventListener("pointercancel", end);
-});
+})
 
-// Apanha as formas que estão dentro da moldura e fecha-as como marioneta
+// Apanha as formas dentro da moldura e guarda-as no primeiro slot livre
 function finishPuppet(frame) {
   const f = frame.getBoundingClientRect();
-  const inside = [...canvas.querySelectorAll(".shape")].filter((s) => {
-    const r = s.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    return cx >= f.left && cx <= f.right && cy >= f.top && cy <= f.bottom;
-  });
 
-  const puppet = inside.map((s) => {
-    const r = s.getBoundingClientRect();
-    return {
-      type: s.dataset.type,
-      x: (r.left - f.left) / f.width,    // posição relativa à moldura (0 a 1)
-      y: (r.top  - f.top)  / f.height,
-    };
-  });
+  const inside = [...canvas.querySelectorAll(".shape")]
+    .filter((s) => {
+      const r = s.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      return cx >= f.left && cx <= f.right && cy >= f.top && cy <= f.bottom;
+    })
+    .sort((a, b) => (Number(a.style.zIndex) || 0) - (Number(b.style.zIndex) || 0));   // mantém quem está por cima
 
-  console.log(puppet);          // por agora só mostramos na consola
+  if (inside.length === 0) return;   // moldura sem formas: não guarda nada
+
+  const index = [...slots].findIndex((_, i) => !puppets[i]);
+  if (index === -1) {                // todos os slots ocupados
+    flashFull();
+    return;                          // a moldura e as formas ficam, para não perderes o trabalho
+  }
+
+  const puppet = {
+    ratio: f.width / f.height,
+    shapes: inside.map((s) => {
+      const r = s.getBoundingClientRect();
+      return {
+        type: s.dataset.type,
+        x: (r.left - f.left) / f.width,     // tudo relativo à moldura (0 a 1)
+        y: (r.top  - f.top)  / f.height,
+        w: r.width  / f.width,
+        h: r.height / f.height,
+      };
+    }),
+  };
+
+  puppets[index] = puppet;
+  renderPuppet(slots[index], puppet);
   inside.forEach((s) => s.remove());
   frame.remove();
 }
+
+// Desenha a miniatura dentro do slot
+function renderPuppet(slot, puppet) {
+  const FIT = 84;   // % do slot que a miniatura pode ocupar
+  const box = document.createElement("div");
+  box.className = "puppet";
+  box.style.width  = `${puppet.ratio >= 1 ? FIT : FIT * puppet.ratio}%`;
+  box.style.height = `${puppet.ratio >= 1 ? FIT / puppet.ratio : FIT}%`;
+
+  puppet.shapes.forEach((s) => {
+    const el = document.createElement("div");
+    el.className = "puppet__shape";
+    el.style.left   = `${s.x * 100}%`;
+    el.style.top    = `${s.y * 100}%`;
+    el.style.width  = `${s.w * 100}%`;
+    el.style.height = `${s.h * 100}%`;
+    // reaproveita o desenho que já está no botão da toolbar
+    el.append(document.querySelector(`.build__tool[data-tool="${s.type}"] svg`).cloneNode(true));
+    box.append(el);
+  });
+
+  slot.append(box);
+}
+
+// O × de cada slot esvazia-o
+slots.forEach((slot, i) => {
+  slot.querySelector(".storage__remove").addEventListener("click", () => {
+    slot.querySelector(".puppet")?.remove();
+    puppets[i] = null;
+  });
+});
+
+// Aviso visual quando não há slots livres
+function flashFull() {
+  const list = document.querySelector(".storage__list");
+  list.classList.remove("is-full");
+  void list.offsetWidth;             // reinicia a animação se carregarem várias vezes
+  list.classList.add("is-full");
+}
+
+
 
 slider.addEventListener("input", updateProgress);
 updateProgress();

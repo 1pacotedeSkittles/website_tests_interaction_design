@@ -231,6 +231,7 @@ body {
     }
 
     .storage__remove {
+        z-index: 1;
         position: absolute;
         top: -8px;
         left: -8px;
@@ -244,4 +245,31 @@ body {
         cursor: pointer;
     }
 
+    .puppet {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		pointer-events: none;       /* os toques passam para o slot e para o × */
+	}
+
+	.puppet__shape {
+		position: absolute;
+		color: #3c3c3c;
+
+		svg {
+			width: 100%;
+			height: 100%;
+		}
+	}
+
+	.storage__list.is-full {
+		animation: shake 0.3s;
+	}
+
+}
+
+@keyframes shake {
+	25%  { transform: translateX(-6px); }
+	75%  { transform: translateX(6px); }
 }
