@@ -24,9 +24,9 @@ body {
         min-width: 0;
     }
 
-    .storage {
-        flex: 0 0 15vw;
-    }
+    /* ==========================================================
+       FASE DE CONSTRUÇÃO
+       ========================================================== */
 
     .phase--build {
         display: grid;
@@ -97,7 +97,7 @@ body {
         width: 10vw;
         height: 50vh;
         justify-content: space-evenly;
-        align-items: left;
+        align-items: flex-start;
         margin-top: 20vh;
         gap: 8px;
         padding: 8px;
@@ -119,9 +119,9 @@ body {
     .build__canvas {
         grid-area: canvas;
         position: relative;
-        /* NOVO: as formas posicionam-se em relação ao canvas */
+        /* as formas posicionam-se em relação ao canvas */
 
-        /* NOVO: formas criadas pelo JS ao arrastar da toolbar */
+        /* formas criadas pelo JS ao arrastar da toolbar */
         .shape {
             position: absolute;
             width: 80px;
@@ -144,7 +144,6 @@ body {
                 outline: 2px dashed #0a84ff;
                 outline-offset: 4px;
             }
-
         }
     }
 
@@ -160,6 +159,8 @@ body {
         border-radius: 8px;
         cursor: pointer;
     }
+
+    /* ---------- Moldura de seleção ---------- */
 
     .frame {
         position: absolute;
@@ -199,6 +200,9 @@ body {
         /* o botão volta a receber toques */
     }
 
+    /* ==========================================================
+       ARMAZENAMENTO DE MARIONETAS
+       ========================================================== */
 
     .storage {
         display: flex;
@@ -220,6 +224,11 @@ body {
         flex-direction: column;
         gap: 16px;
         list-style: none;
+
+        /* abana quando não há slots livres (ver @keyframes shake no fim) */
+        &.is-full {
+            animation: shake 0.3s;
+        }
     }
 
     .storage__slot {
@@ -228,13 +237,19 @@ body {
         aspect-ratio: 1;
         border: 1px dashed #888;
         border-radius: 6px;
+
+        /* marioneta "levantada" enquanto a arrastas para fora */
+        &.is-lifted .puppet {
+            opacity: 0.3;
+        }
     }
 
     .storage__remove {
-        z-index: 1;
         position: absolute;
         top: -8px;
         left: -8px;
+        z-index: 1;
+        /* fica por cima da miniatura */
         width: 18px;
         height: 18px;
         border-radius: 50%;
@@ -245,31 +260,27 @@ body {
         cursor: pointer;
     }
 
-    .puppet {
-		position: absolute;
-		left: 50%;
-		top: 50%;
-		transform: translate(-50%, -50%);
-		pointer-events: none;       /* os toques passam para o slot e para o × */
-	}
+    /* ==========================================================
+       FASE DE MANIPULAÇÃO (palco)
+       ========================================================== */
 
-	.puppet__shape {
-		position: absolute;
-		color: #3c3c3c;
+    .phase--manipulate {
+        display: flex;
+        flex-direction: column;
+    }
 
-		svg {
-			width: 100%;
-			height: 100%;
-		}
-	}
-
-	.storage__list.is-full {
-		animation: shake 0.3s;
-	}
+    .manipulate__stage {
+        position: relative;
+        /* as marionetas posicionam-se em relação ao palco */
+        flex: 1;
+        /* ocupa o espaço que sobra por baixo dos controlos */
+        min-height: 0;
+    }
 
 }
 
+/* @keyframes não pode ficar aninhado, por isso fica fora do .app */
 @keyframes shake {
-	25%  { transform: translateX(-6px); }
-	75%  { transform: translateX(6px); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
 }
