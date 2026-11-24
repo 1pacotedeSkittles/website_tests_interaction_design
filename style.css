@@ -142,24 +142,37 @@ body {
                 cursor: grabbing;
             }
 
+            /* ponto âncora: mais pequeno; azul quando está ligado a dois elementos */
+            &.shape--anchor {
+                width: 44px;
+                height: 44px;
+                color: #8a8a8a;
+            }
+
+            &.shape--anchor.is-connected {
+                color: #0a84ff;
+            }
+
+            /* âncora selecionado: halo à volta dele */
+            &.shape--anchor.is-selected {
+                outline: 3px solid #0a84ff;
+                outline-offset: 5px;
+                border-radius: 50%;
+                background: rgba(10, 132, 255, 0.12);
+            }
+
+            /* elementos ligados ao âncora selecionado: arrastar roda-os à volta dele */
+            &.is-rotatable {
+                outline: 2px dashed #0a84ff;
+                outline-offset: 4px;
+                cursor: crosshair;
+            }
+
             &.is-selected {
                 outline: 2px dashed #0a84ff;
                 outline-offset: 4px;
             }
         }
-    }
-
-    .build__ready {
-        position: absolute;
-        right: 0vw;
-        bottom: 4vh;
-        padding: 12px 32px;
-        font-size: 1.5rem;
-        font-weight: 700;
-        background: #b8f7c8;
-        border: 0;
-        border-radius: 8px;
-        cursor: pointer;
     }
 
     /* ---------- Moldura de seleção ---------- */
