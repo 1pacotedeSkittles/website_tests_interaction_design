@@ -112,7 +112,7 @@ tools.forEach((tool) => {
    o READY da moldura chama onReady(frame).
    ========================================================== */
 
-function enableSelection(area, onReady) {
+function enableSelection(area, onReady, label = "READY", extraClass = "") {
 	area.addEventListener("pointerdown", (e) => {
 		if (e.target !== area) return;               // só no fundo vazio
 
@@ -150,8 +150,8 @@ function enableSelection(area, onReady) {
 
 			const btn = document.createElement("button");
 			btn.type = "button";
-			btn.className = "frame__ready";
-			btn.textContent = "READY";
+			btn.className = `frame__ready ${extraClass}`;
+			btn.textContent = label;
 			btn.addEventListener("click", () => onReady(frame));
 			frame.append(btn);
 
@@ -171,7 +171,7 @@ function enableSelection(area, onReady) {
 }
 
 enableSelection(canvas, finishPuppet);      // construção: formas -> slot
-enableSelection(stage, returnToBuild);      // palco: marionetas -> construção
+enableSelection(stage, returnToStorage, "Return", "frame__ready--return");   // palco: marionetas -> slots
 
 // Verdadeiro se o centro do elemento está dentro da moldura
 function centerInside(el, f) {
@@ -220,32 +220,32 @@ function finishPuppet(frame) {
 	frame.remove();
 }
 
-// PALCO: apanha as marionetas dentro da moldura e devolve-as à construção
-function returnToBuild(frame) {
-	const f  = frame.getBoundingClientRect();
-	const sR = stage.getBoundingClientRect();
-	const cR = canvas.getBoundingClientRect();
+// PALCO: apanha as marionetas dentro da moldura e devolve-as aos slots
+function returnToStorage(frame) {
+	const f = frame.getBoundingClientRect();
 
 	const picked = [...stage.querySelectorAll(".puppet")].filter((el) => centerInside(el, f));
 	if (picked.length === 0) return;   // moldura sem marionetas
 
+	let allReturned = true;
+
 	picked.forEach((el) => {
-		const puppet = el.puppetData;
-		const r = el.getBoundingClientRect();
+		const index = [...slots].findIndex((_, i) => !puppets[i]);
+		if (index === -1) {            // sem slots livres: esta fica no palco
+			allReturned = false;
+			return;
+		}
 
-		// mesma posição relativa no canvas que tinha no palco...
-		let cx = cR.left + ((r.left + r.width  / 2 - sR.left) / sR.width)  * cR.width;
-		let cy = cR.top  + ((r.top  + r.height / 2 - sR.top)  / sR.height) * cR.height;
-
-		// ...mas sem sair do canvas
-		cx = Math.max(cR.left + puppet.width  / 2, Math.min(cx, cR.right  - puppet.width  / 2));
-		cy = Math.max(cR.top  + puppet.height / 2, Math.min(cy, cR.bottom - puppet.height / 2));
-
-		restoreToBuild(puppet, { clientX: cx, clientY: cy });
+		puppets[index] = el.puppetData;
+		renderPuppet(slots[index], el.puppetData);
 		el.remove();
 	});
 
-	frame.remove();
+	if (allReturned) {
+		frame.remove();
+	} else {
+		flashFull();                   // a moldura fica, para veres o que não coube
+	}
 }
 
 

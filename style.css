@@ -186,6 +186,11 @@ body {
         /* o botão volta a receber toques */
     }
 
+    /* botão "Return" da moldura do palco */
+    .frame__ready--return {
+        background: #c4d3f4;
+    }
+
     .frame__close {
         position: absolute;
         top: -14px;
