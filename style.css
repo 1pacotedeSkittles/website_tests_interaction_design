@@ -18,6 +18,8 @@ body {
     display: flex;
     height: 100dvh;
     gap: 16px;
+    touch-action: none;
+    /* o browser não rouba os gestos de toque (scroll/zoom) */
 
     .phase {
         flex: 1;
@@ -258,6 +260,13 @@ body {
         font-size: 0.75rem;
         line-height: 1;
         cursor: pointer;
+
+        /* área de toque maior do que o círculo visível */
+        &::after {
+            content: "";
+            position: absolute;
+            inset: -14px;
+        }
     }
 
     /* ==========================================================

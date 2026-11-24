@@ -10,6 +10,9 @@ const SHAPE_SIZE = 80;
 let topZ = 1;
 const puppets = [];   // puppets[i] = dados da marioneta guardada no slot i
 
+// Toque: a pressão longa abre o menu de contexto e cancela o gesto
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+
 
 /* ==========================================================
    INSTRUÇÕES (slider)
@@ -121,6 +124,7 @@ canvas.addEventListener("pointerdown", (e) => {
 	canvas.setPointerCapture(e.pointerId);
 
 	function move(ev) {
+		if (ev.pointerId !== e.pointerId) return;   // ignora outros dedos
 		const x = clamp(ev.clientX - rect.left, rect.width);
 		const y = clamp(ev.clientY - rect.top, rect.height);
 		frame.style.left   = `${Math.min(startX, x)}px`;
@@ -129,7 +133,8 @@ canvas.addEventListener("pointerdown", (e) => {
 		frame.style.height = `${Math.abs(y - startY)}px`;
 	}
 
-	function end() {
+	function end(ev) {
+		if (ev.pointerId !== e.pointerId) return;   // ignora outros dedos
 		canvas.removeEventListener("pointermove", move);
 		canvas.removeEventListener("pointerup", end);
 		canvas.removeEventListener("pointercancel", end);
