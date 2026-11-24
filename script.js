@@ -107,76 +107,86 @@ tools.forEach((tool) => {
 
 
 /* ==========================================================
-   FASE DE CONSTRUÇÃO: moldura de seleção
+   MOLDURA DE SELEÇÃO (serve a construção e o palco)
+   Arrasta no fundo vazio de uma área para desenhar a moldura;
+   o READY da moldura chama onReady(frame).
    ========================================================== */
 
-canvas.addEventListener("pointerdown", (e) => {
-	if (e.target !== canvas) return;               // só no fundo vazio
+function enableSelection(area, onReady) {
+	area.addEventListener("pointerdown", (e) => {
+		if (e.target !== area) return;               // só no fundo vazio
 
-	const rect = canvas.getBoundingClientRect();
-	const clamp = (v, max) => Math.max(0, Math.min(v, max));
-	const startX = clamp(e.clientX - rect.left, rect.width);
-	const startY = clamp(e.clientY - rect.top, rect.height);
+		const rect = area.getBoundingClientRect();
+		const clamp = (v, max) => Math.max(0, Math.min(v, max));
+		const startX = clamp(e.clientX - rect.left, rect.width);
+		const startY = clamp(e.clientY - rect.top, rect.height);
 
-	const frame = document.createElement("div");
-	frame.className = "frame";
-	canvas.append(frame);
-	canvas.setPointerCapture(e.pointerId);
+		const frame = document.createElement("div");
+		frame.className = "frame";
+		area.append(frame);
+		area.setPointerCapture(e.pointerId);
 
-	function move(ev) {
-		if (ev.pointerId !== e.pointerId) return;   // ignora outros dedos
-		const x = clamp(ev.clientX - rect.left, rect.width);
-		const y = clamp(ev.clientY - rect.top, rect.height);
-		frame.style.left   = `${Math.min(startX, x)}px`;
-		frame.style.top    = `${Math.min(startY, y)}px`;
-		frame.style.width  = `${Math.abs(x - startX)}px`;
-		frame.style.height = `${Math.abs(y - startY)}px`;
-	}
-
-	function end(ev) {
-		if (ev.pointerId !== e.pointerId) return;   // ignora outros dedos
-		canvas.removeEventListener("pointermove", move);
-		canvas.removeEventListener("pointerup", end);
-		canvas.removeEventListener("pointercancel", end);
-
-		// moldura minúscula = toque sem querer: descarta
-		if (frame.offsetWidth < 60 || frame.offsetHeight < 60) {
-			frame.remove();
-			return;
+		function move(ev) {
+			if (ev.pointerId !== e.pointerId) return;   // ignora outros dedos
+			const x = clamp(ev.clientX - rect.left, rect.width);
+			const y = clamp(ev.clientY - rect.top, rect.height);
+			frame.style.left   = `${Math.min(startX, x)}px`;
+			frame.style.top    = `${Math.min(startY, y)}px`;
+			frame.style.width  = `${Math.abs(x - startX)}px`;
+			frame.style.height = `${Math.abs(y - startY)}px`;
 		}
 
-		const btn = document.createElement("button");
-		btn.type = "button";
-		btn.className = "frame__ready";
-		btn.textContent = "READY";
-		btn.addEventListener("click", () => finishPuppet(frame));
-		frame.append(btn);
+		function end(ev) {
+			if (ev.pointerId !== e.pointerId) return;   // ignora outros dedos
+			area.removeEventListener("pointermove", move);
+			area.removeEventListener("pointerup", end);
+			area.removeEventListener("pointercancel", end);
 
-		const close = document.createElement("button");
-		close.type = "button";
-		close.className = "frame__close";
-		close.textContent = "×";
-		close.setAttribute("aria-label", "Remove selection");
-		close.addEventListener("click", () => frame.remove());
-		frame.append(close);
-	}
+			// moldura minúscula = toque sem querer: descarta
+			if (frame.offsetWidth < 60 || frame.offsetHeight < 60) {
+				frame.remove();
+				return;
+			}
 
-	canvas.addEventListener("pointermove", move);
-	canvas.addEventListener("pointerup", end);
-	canvas.addEventListener("pointercancel", end);
-});
+			const btn = document.createElement("button");
+			btn.type = "button";
+			btn.className = "frame__ready";
+			btn.textContent = "READY";
+			btn.addEventListener("click", () => onReady(frame));
+			frame.append(btn);
 
-// Apanha as formas dentro da moldura e guarda-as no primeiro slot livre
+			const close = document.createElement("button");
+			close.type = "button";
+			close.className = "frame__close";
+			close.textContent = "×";
+			close.setAttribute("aria-label", "Remove selection");
+			close.addEventListener("click", () => frame.remove());
+			frame.append(close);
+		}
+
+		area.addEventListener("pointermove", move);
+		area.addEventListener("pointerup", end);
+		area.addEventListener("pointercancel", end);
+	});
+}
+
+enableSelection(canvas, finishPuppet);      // construção: formas -> slot
+enableSelection(stage, returnToBuild);      // palco: marionetas -> construção
+
+// Verdadeiro se o centro do elemento está dentro da moldura
+function centerInside(el, f) {
+	const r = el.getBoundingClientRect();
+	const cx = r.left + r.width / 2;
+	const cy = r.top + r.height / 2;
+	return cx >= f.left && cx <= f.right && cy >= f.top && cy <= f.bottom;
+}
+
+// CONSTRUÇÃO: apanha as formas dentro da moldura e guarda-as no primeiro slot livre
 function finishPuppet(frame) {
 	const f = frame.getBoundingClientRect();
 
 	const inside = [...canvas.querySelectorAll(".shape")]
-		.filter((s) => {
-			const r = s.getBoundingClientRect();
-			const cx = r.left + r.width / 2;
-			const cy = r.top + r.height / 2;
-			return cx >= f.left && cx <= f.right && cy >= f.top && cy <= f.bottom;
-		})
+		.filter((s) => centerInside(s, f))
 		.sort((a, b) => (Number(a.style.zIndex) || 0) - (Number(b.style.zIndex) || 0));   // mantém quem está por cima
 
 	if (inside.length === 0) return;   // moldura sem formas: não guarda nada
@@ -207,6 +217,34 @@ function finishPuppet(frame) {
 	renderPuppet(slots[index], puppet);
 
 	inside.forEach((s) => s.remove());
+	frame.remove();
+}
+
+// PALCO: apanha as marionetas dentro da moldura e devolve-as à construção
+function returnToBuild(frame) {
+	const f  = frame.getBoundingClientRect();
+	const sR = stage.getBoundingClientRect();
+	const cR = canvas.getBoundingClientRect();
+
+	const picked = [...stage.querySelectorAll(".puppet")].filter((el) => centerInside(el, f));
+	if (picked.length === 0) return;   // moldura sem marionetas
+
+	picked.forEach((el) => {
+		const puppet = el.puppetData;
+		const r = el.getBoundingClientRect();
+
+		// mesma posição relativa no canvas que tinha no palco...
+		let cx = cR.left + ((r.left + r.width  / 2 - sR.left) / sR.width)  * cR.width;
+		let cy = cR.top  + ((r.top  + r.height / 2 - sR.top)  / sR.height) * cR.height;
+
+		// ...mas sem sair do canvas
+		cx = Math.max(cR.left + puppet.width  / 2, Math.min(cx, cR.right  - puppet.width  / 2));
+		cy = Math.max(cR.top  + puppet.height / 2, Math.min(cy, cR.bottom - puppet.height / 2));
+
+		restoreToBuild(puppet, { clientX: cx, clientY: cy });
+		el.remove();
+	});
+
 	frame.remove();
 }
 
@@ -343,7 +381,8 @@ function dragPuppetOut(slot, i, puppet, e) {
 	move(e);
 }
 
-// Volta a transformar a marioneta em formas editáveis na fase de construção
+// Volta a transformar a marioneta em formas editáveis na fase de construção.
+// "ev" só precisa de ter clientX e clientY (o centro onde a marioneta fica).
 function restoreToBuild(puppet, ev) {
 	const rect = canvas.getBoundingClientRect();
 	const left = ev.clientX - rect.left - puppet.width / 2;
@@ -359,15 +398,64 @@ function restoreToBuild(puppet, ev) {
 	});
 }
 
+
+/* ==========================================================
+   PALCO: marionetas
+   ========================================================== */
+
 // Põe a marioneta inteira no palco
 function placeOnStage(puppet, ev) {
 	const rect = stage.getBoundingClientRect();
 	const el = createPuppetEl(puppet);
+	el.puppetData = puppet;            // guardamos os dados para a poder devolver à construção
 	el.style.cssText = `
 		position: absolute;
 		width: ${puppet.width}px; height: ${puppet.height}px;
 		left: ${ev.clientX - rect.left - puppet.width / 2}px;
 		top:  ${ev.clientY - rect.top  - puppet.height / 2}px;
+		touch-action: none;
+		cursor: grab;
 	`;
+
+	// depois de largada, pode ser movida pelo palco
+	el.addEventListener("pointerdown", (e) => dragOnStage(el, e));
+
 	stage.append(el);
+}
+
+// Mover uma marioneta já colocada no palco
+function dragOnStage(el, e) {
+	const rect = stage.getBoundingClientRect();
+	const box  = el.getBoundingClientRect();
+	const grab = { x: e.clientX - box.left, y: e.clientY - box.top };
+	const prev = { left: el.style.left, top: el.style.top };
+
+	el.setPointerCapture(e.pointerId);
+	el.style.zIndex = ++topZ;          // a última a ser mexida fica por cima
+	el.style.cursor = "grabbing";
+
+	function move(ev) {
+		el.style.left = `${ev.clientX - rect.left - grab.x}px`;
+		el.style.top  = `${ev.clientY - rect.top  - grab.y}px`;
+	}
+
+	function end() {
+		el.removeEventListener("pointermove", move);
+		el.removeEventListener("pointerup", end);
+		el.removeEventListener("pointercancel", end);
+		el.style.cursor = "grab";
+
+		// o centro da marioneta tem de ficar dentro do palco
+		const b  = el.getBoundingClientRect();
+		const cx = b.left + b.width / 2;
+		const cy = b.top  + b.height / 2;
+		const inside = cx >= rect.left && cx <= rect.right &&
+		               cy >= rect.top  && cy <= rect.bottom;
+
+		if (!inside) Object.assign(el.style, prev);   // fora do palco: volta onde estava
+	}
+
+	el.addEventListener("pointermove", move);
+	el.addEventListener("pointerup", end);
+	el.addEventListener("pointercancel", end);
 }
