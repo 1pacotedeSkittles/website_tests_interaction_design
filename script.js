@@ -38,6 +38,7 @@ function createShape(tool) {
 
 	// formas já colocadas podem ser agarradas outra vez
 	shape.addEventListener("pointerdown", (e) => {
+		if (shape.classList.contains("is-dragging")) return;   // já está a ser arrastada por outro dedo
 		const box = shape.getBoundingClientRect();
 		beginDrag(shape, e, { x: e.clientX - box.left, y: e.clientY - box.top }, false);
 	});
@@ -54,11 +55,13 @@ function beginDrag(shape, e, grab, isNew) {
 	shape.classList.add("is-dragging");
 
 	function move(ev) {
+		if (ev.pointerId !== e.pointerId) return;   // só o dedo que agarrou a forma
 		shape.style.left = `${ev.clientX - rect.left - grab.x}px`;
 		shape.style.top  = `${ev.clientY - rect.top  - grab.y}px`;
 	}
 
-	function end() {
+	function end(ev) {
+		if (ev.pointerId !== e.pointerId) return;   // só o dedo que agarrou a forma
 		shape.removeEventListener("pointermove", move);
 		shape.removeEventListener("pointerup", end);
 		shape.removeEventListener("pointercancel", end);
@@ -320,6 +323,7 @@ slots.forEach((slot, i) => {
 	slot.addEventListener("pointerdown", (e) => {
 		const puppet = puppets[i];
 		if (!puppet || e.target.closest(".storage__remove")) return;
+		if (slot.classList.contains("is-lifted")) return;   // já está a ser arrastada por outro dedo
 		dragPuppetOut(slot, i, puppet, e);
 	});
 });
@@ -351,11 +355,13 @@ function dragPuppetOut(slot, i, puppet, e) {
 	};
 
 	function move(ev) {
+		if (ev.pointerId !== e.pointerId) return;   // só o dedo que agarrou a marioneta
 		ghost.style.left = `${ev.clientX}px`;
 		ghost.style.top  = `${ev.clientY}px`;
 	}
 
-	function cleanup() {
+	function cleanup(ev) {
+		if (ev && ev.pointerId !== e.pointerId) return;   // cancelamento de outro dedo: ignora
 		slot.removeEventListener("pointermove", move);
 		slot.removeEventListener("pointerup", end);
 		slot.removeEventListener("pointercancel", cleanup);
@@ -364,6 +370,7 @@ function dragPuppetOut(slot, i, puppet, e) {
 	}
 
 	function end(ev) {
+		if (ev.pointerId !== e.pointerId) return;   // só o dedo que agarrou a marioneta
 		cleanup();
 		if (inside(canvas, ev)) {
 			restoreToBuild(puppet, ev);
@@ -425,6 +432,9 @@ function placeOnStage(puppet, ev) {
 
 // Mover uma marioneta já colocada no palco
 function dragOnStage(el, e) {
+	if (el.dataset.dragging) return;   // já está a ser arrastada por outro dedo
+	el.dataset.dragging = "1";
+
 	const rect = stage.getBoundingClientRect();
 	const box  = el.getBoundingClientRect();
 	const grab = { x: e.clientX - box.left, y: e.clientY - box.top };
@@ -435,11 +445,14 @@ function dragOnStage(el, e) {
 	el.style.cursor = "grabbing";
 
 	function move(ev) {
+		if (ev.pointerId !== e.pointerId) return;   // só o dedo que agarrou a marioneta
 		el.style.left = `${ev.clientX - rect.left - grab.x}px`;
 		el.style.top  = `${ev.clientY - rect.top  - grab.y}px`;
 	}
 
-	function end() {
+	function end(ev) {
+		if (ev.pointerId !== e.pointerId) return;   // só o dedo que agarrou a marioneta
+		delete el.dataset.dragging;
 		el.removeEventListener("pointermove", move);
 		el.removeEventListener("pointerup", end);
 		el.removeEventListener("pointercancel", end);
